@@ -1,4 +1,4 @@
-# stream-to-messages (NodeJS)
+# buffer-to-messages (NodeJS)
 
 Parses a stream of buffers into messages
 
@@ -6,13 +6,13 @@ Parses a stream of buffers into messages
 
 Get the package from NPM
 
-    npm install stream-to-messages
+    npm install buffer-to-messages
 
 Now create an instance inside your application which simply logs the finalized
 messages to the console, and has a prefix of 2 bytes indicating the size of the
 message.
 
-    var Converter = require('stream-to-messages');
+    var Converter = require('buffer-to-messages');
 
     var converter = new Converter(2, function(message) {
       console.log('got message:', message.toString());
