@@ -2,7 +2,15 @@ var STATE_LENGTH_IN_PROGRESS = 1
   , STATE_CONTENT_IN_PROGRESS = 2;
 
 /**
- * Converts a Buffer stream into separate messages
+ * Takes in a series of Buffers and calls back whenever a fixed-length
+ * message has been completely processed.
+ *
+ * @param {Integer} [prefixLength] - The length in bytes of the size prefix.
+ * This argument is optional. The default length is 2 bytes, but can also be 1
+ * or 4 bytes.
+ *
+ * @param {Function} callback - This will be called every time a new message has
+ * been completely processed.
  */
 var Converter = function Converter() {
 
@@ -19,6 +27,8 @@ var Converter = function Converter() {
   } else if (arguments.length >= 2) {
 
     this._bl = arguments[0];
+    if (this._bl !== 1 && this._bl !== 2 && this._bl !== 4)
+      throw new TypeError("Prefix length must be 1, 2 or 4");
 
     if (typeof arguments[1] !== "function")
       throw new TypeError("Converter requires a callback function");
@@ -29,6 +39,7 @@ var Converter = function Converter() {
     throw new Error("cannot construct a converter without a callback");
   }
 
+  this.flush();
 };
 
 Converter.bufferToInt = function(buffer) {
@@ -63,13 +74,12 @@ Converter.remaining = function(buffer, index) {
   return buffer.length - index;
 };
 
-
-
-Converter.prototype._state = STATE_LENGTH_IN_PROGRESS;
-Converter.prototype._lengthCache = null;
-Converter.prototype._contentCache = null;
-Converter.prototype._contentLength = null;
-
+/**
+ * Process the given buffer.
+ * @param  {Buffer}   buffer - Process a new buffer snippet
+ * @param  {Function} [cb] - Override the callback just for this snippet. This
+ * is used for testing purposes.
+ */
 Converter.prototype.process = function(b, cb) {
   if (!cb)
     cb = this._fx;
@@ -185,13 +195,41 @@ Converter.prototype._messageDone = function(msg, cb) {
   this._contentCache = null;
   this._contentLength = null;
   this._state = STATE_LENGTH_IN_PROGRESS;
-  cb(msg);
+  if (msg.length > 0)
+    cb(msg);
   //console.log('\t -- Message completed, sending', msg);
 };
 
+/**
+ * Create a new message buffer with an appropriate length prefix
+ * (Note: necessary?)
+ * @param  {Buffer} buffer
+ */
 Converter.prototype.create = function(buffer) {
   var l = Converter.intToBuffer(buffer.length, this._bl);
   return Buffer.concat([l, buffer]);
+};
+
+/**
+ * This creates a new buffer containing the length prefix of the given buffer
+ *
+ * @param {Buffer} buffer
+ * @return {Buffer} - A buffer containing a compatible length-prefix
+ */
+Converter.prototype.createPrefix = function(buffer) {
+  return Converter.intToBuffer(buffer.length, this._bl);
+};
+
+/**
+ * This flushes the converter instance. It clears all the cached strings and
+ * resets the state. Use this whenever the processor might go out of sync (e.g.
+ * when a tcp connection times out and you reconnect)
+ */
+Converter.prototype.flush = function() {
+  this._state = STATE_LENGTH_IN_PROGRESS;
+  this._lengthCache = null;
+  this._contentCache = null;
+  this._contentLength = null;
 };
 
 module.exports = Converter;
